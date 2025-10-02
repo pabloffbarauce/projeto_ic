@@ -1,7 +1,9 @@
 import math
+import numpy as np
+from numpy import trapezoid
 
-x_data = [0,15,30,45,60,420,435, 450,465,480,495,510,525,540,555,570,585,600,615,630]
-y_data = [0.029,0.029,0.0314,0.0338,0.0422,0.1106,0.1154,0.1178,0.1202,0.1346,0.1274,0.1286,0.137,0.137,0.1382,0.1418,0.1394,0.1394,0.1382,0.137]
+x_data = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5]
+y_data = [126.7, 131.3, 133.9, 165.6, 242.7, 450.6, 509, 584.7, 591.2, 553,5]
 
 x_y_curve = []
 
@@ -32,6 +34,7 @@ def xAty50(x_y_curve):
                 return (x1 + x2) / 2
             x_interpolated = x1 + (x2 - x1) * (y_mid - y1) / (y2 - y1)
             return x_interpolated
+    return None
 
 def curveParameters(x_y_curve):
     if len(x_y_curve) < 2:
@@ -53,12 +56,45 @@ A1, A2 = curveParameters(x_y_curve)
 x0 = xAty50(x_y_curve)
 treated_x_y_curve = []
 
+if x0 is None:
+    print("xaty50 could not be determined. Check the input data.")
+    exit()
+
 for i in range(len(x_y_curve)):
     y = A2 + (A1-A2)/(1 + math.exp((x_data[i]-x0)/dx))
     treated_x_y_curve.append((x_data[i], y))
-    print(treated_x_y_curve[i])
+    print(f"({treated_x_y_curve[i][0]:.2f}) ({treated_x_y_curve[i][1]:.5f})")
 
+y_treated_values = [point[1] for point in treated_x_y_curve]
+y_treated_max = max(y_treated_values)
+print(y_treated_max) ; print("")
 
+f_curve = []
 
+for i in range(len(x_y_curve)):
+    f_curve.append(treated_x_y_curve[i][1] / y_treated_max)
+    print(f_curve[i])
 
+print("")
+
+x_values_np = np.array(x_data)
+f_values_np = np.array(f_curve)
+E_t_curve = np.gradient(f_values_np, x_values_np)
+
+for x_val, e_val in zip(x_values_np, E_t_curve):
+    print(f"At x = {x_val:.2f} : E(t) = {e_val:.5f}")
+
+integrand = x_values_np * E_t_curve
+hydraulic_time = trapezoid(integrand, x_values_np)
+print("")
+print(f"{hydraulic_time:.5f}")
+
+variance_calc = (x_values_np - hydraulic_time) ** 2 * E_t_curve
+variance = trapezoid(variance_calc, x_values_np)
+print(variance)
+print("")
+sigma_theta = (variance/(hydraulic_time**2))
+print(sigma_theta)
+N = 1/sigma_theta
+print(N)
 
