@@ -96,5 +96,5 @@ print("")
 sigma_theta = (variance/(hydraulic_time**2))
 print(sigma_theta)
 N = 1/sigma_theta
-print(N)
-
+integer_N = round(N)
+print(integer_N)
