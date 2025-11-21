@@ -56,3 +56,5 @@ dkms.conf
 *.bin
 *.dat
 .idea/
+__pycache__/
+*.pyc
