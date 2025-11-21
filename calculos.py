@@ -52,14 +52,10 @@ def initial_data(x_data, y_data):
 
 
 def boltzmann(x_data, x_y_curve):
-    """
-    Realiza o ajuste da curva usando a função logística.
-    Retorna a lista de tuplas tratadas (treated_x_y_curve).
-    """
     x_values = [point[0] for point in x_y_curve]
     x_min, x_max = min(x_values), max(x_values)
 
-    # Cálculo dos parâmetros
+    # cálculo dos parâmetros
     dx = (x_max - x_min) / 20.0
     A1, A2 = curveParameters(x_y_curve)
     x0 = xAty50(x_y_curve)
@@ -77,12 +73,8 @@ def boltzmann(x_data, x_y_curve):
 
 
 def f_curve_calc(treated_x_y_curve):
-    """
-    Calcula a Curva F normalizando os dados tratados.
-    Retorna a lista f_curve e o valor máximo usado na normalização.
-    """
     y_treated_values = [point[1] for point in treated_x_y_curve]
-    y_treated_max = max(y_treated_values)
+    y_treated_max = max(y_treated_values) # pega o maior valor de Y
 
     f_curve = []
     for i in range(len(treated_x_y_curve)):
@@ -90,30 +82,25 @@ def f_curve_calc(treated_x_y_curve):
 
     return f_curve, y_treated_max
 
-
 def final_stats(x_data, f_curve):
-    """
-    Realiza cálculos de derivada e integral para encontrar parâmetros de residência (RTD).
-    Retorna um dicionário com todos os resultados estatísticos.
-    """
     x_values_np = np.array(x_data)
     f_values_np = np.array(f_curve)
 
-    # Cálculo da Curva E (Derivada)
+    # derivada curva E
     E_t_curve = np.gradient(f_values_np, x_values_np)
 
-    # Tempo Hidráulico (Primeiro momento)
+    # tempo hidráulico
     integrand = x_values_np * E_t_curve
     hydraulic_time = trapezoid(integrand, x_values_np)
 
-    # Variância (Segundo momento central)
+    # variância
     variance_calc = (x_values_np - hydraulic_time) ** 2 * E_t_curve
     variance = trapezoid(variance_calc, x_values_np)
 
-    # Variância adimensional e N
+    # sigma theta
     sigma_theta = (variance / (hydraulic_time ** 2))
 
-    # Evita divisão por zero se sigma for 0 (apenas segurança)
+    # valor de N
     N = 1 / sigma_theta if sigma_theta != 0 else 0
 
     return {
@@ -126,17 +113,15 @@ def final_stats(x_data, f_curve):
     }
 
 
-# --- Bloco Principal de Execução ---
 
 def main():
-    # 1. Dados de entrada
     x_data = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5, 5.25,
               5.5, 5.75, 6, 6.25, 6.5, 6.75]
     y_data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.064053751, 0.131690929, 0.154087346, 0.16019037, 0.176315789,
               0.180011198, 0.178443449, 0.180011198, 0.191041433, 0.183706607, 0.182754759, 0.182866741, 0.18980963,
               0.199384099, 0.193673012]
 
-    # 2. tratando os dados
+    # tratando os dados
     x_y_curve = initial_data(x_data, y_data)
 
     # ajustando a curva
