@@ -53,6 +53,12 @@ Em seguida, instale as bibliotecas necessárias do projeto:
 sudo apt install python3-tk python3-numpy python3-scipy python3-openpyxl python3-matplotlib
 ```
 
+A partir disso, entre na pasta em que os arquivos calculos.py e interface.py estão e execute:
+```bash
+cd <insira-seu-diretório>
+python3 interface.py
+```
+
 ## Como usar o programa
  
 1. Insira os valores de **tempo** e **concentração** nos campos correspondentes (um valor por linha, ambas as colunas com a mesma quantidade de elementos).
