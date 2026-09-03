@@ -26,6 +26,8 @@ Com o Python instalado, instale as bibliotecas necessárias através do Windows 
 pip install numpy scipy matplotlib openpyxl
 ```
 
+Outro método é através do download
+
 ### Linux
 Para checar se a distribuição do Linux possui o Python, utilize o comando:
 ```bash
@@ -49,6 +51,18 @@ sudo apt install python3-tk python3-numpy python3-scipy python3-openpyxl python3
 2. Clique em **"Exemplo"** para carregar um conjunto de dados de demonstração, se quiser apenas testar o programa.
 3. Clique em **"CALCULAR & PLOTAR"** para rodar o ajuste e visualizar os gráficos e o resumo estatístico.
 4. Clique em **"EXPORTAR .XLSX"** para salvar os resultados completos (tempo, concentração, concentração ajustada, curva F, curva E, θh, σ², σθ² e N) em uma planilha.
+
+## Imagens do software
+
+Programa sem entrada de dados:
+<img width="1593" height="928" alt="image" src="https://github.com/user-attachments/assets/0f50810a-8f1f-4bdd-b4c4-062862f53d60" />
+
+Exemplo de entrada de dados:
+<img width="1591" height="920" alt="image" src="https://github.com/user-attachments/assets/06b03e12-0339-4cb8-850f-19eafcff99de" />
+
+Planilha exportada:
+<img width="917" height="741" alt="image" src="https://github.com/user-attachments/assets/e7f88b8e-1c67-48f3-97d3-326ba27cfaf5" />
+
 
 ## Metodologia utilizada
  
