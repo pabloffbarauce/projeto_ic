@@ -16,6 +16,14 @@ A partir dos dados de tempo e concentração, o programa realiza o ajuste sigmoi
 
 ### Windows
 
+**Método recomendado: baixar o executável pronto**
+ 
+Outro método é através do download do executável já compilado, disponível na [página de Releases](https://github.com/pabloffbarauce/projeto_ic/releases) do repositório. Basta baixar o arquivo `.exe` da versão mais recente e executá-lo — não é necessário instalar Python nem nenhuma biblioteca.
+ 
+> O Windows pode exibir um aviso do SmartScreen na primeira execução, por não reconhecer o publicador do arquivo. Clique em **"Mais informações"** e depois em **"Executar assim mesmo"** para prosseguir.
+
+**Método alternativo: rodar via código-fonte**
+
 Se você ainda não tem Python instalado:
  
 1. Baixe o instalador em [python.org/downloads](https://www.python.org/downloads/).
