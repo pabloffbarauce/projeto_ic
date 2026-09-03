@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, scrolledtext, ttk
+from tkinter import messagebox, scrolledtext, ttk, filedialog
 import calculos
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -8,15 +8,19 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 class programa:
     def __init__(self, root):
         self.janela = root
-        self.janela.title("Análise Hidrodinâmica - Curva C e Ajuste")
+        self.janela.title("Análise Hidrodinâmica")
         self.janela.geometry("800x600")
         self.janela.after(800, lambda: self.janela.geometry("1600x900"))
 
-        # Container principal
+        self.last_x = None
+        self.last_y = None
+        self.last_treated = None
+        self.last_f_curve = None
+        self.last_stats = None
+
         main_container = tk.Frame(self.janela)
         main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # PAINEL ESQUERDO (Configurações e Dados)
         left_frame = tk.Frame(main_container)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10)
 
@@ -25,31 +29,25 @@ class programa:
         input_container = tk.Frame(left_frame)
         input_container.pack(pady=5)
 
-        # Coluna X
         frame_x = tk.Frame(input_container)
         frame_x.pack(side=tk.LEFT, padx=5)
         tk.Label(frame_x, text="Tempo (X)", font=("Arial", 9, "bold")).pack()
         self.txt_input_x = scrolledtext.ScrolledText(frame_x, width=12, height=10)
         self.txt_input_x.pack()
-        # Contador X
         self.lbl_count_x = tk.Label(frame_x, text="Elementos: 0", font=("Arial", 8, "italic"))
         self.lbl_count_x.pack()
 
-        # Coluna Y
         frame_y = tk.Frame(input_container)
         frame_y.pack(side=tk.LEFT, padx=5)
         tk.Label(frame_y, text="Concentração (Y)", font=("Arial", 9, "bold")).pack()
         self.txt_input_y = scrolledtext.ScrolledText(frame_y, width=12, height=10)
         self.txt_input_y.pack()
-        # Contador Y
         self.lbl_count_y = tk.Label(frame_y, text="Elementos: 0", font=("Arial", 8, "italic"))
         self.lbl_count_y.pack()
 
-        # Vincular atualização dos contadores ao digitar
         self.txt_input_x.bind("<KeyRelease>", self.update_counters)
         self.txt_input_y.bind("<KeyRelease>", self.update_counters)
 
-        # Botões
         btn_frame = tk.Frame(left_frame)
         btn_frame.pack(pady=10, fill=tk.X)
         tk.Button(btn_frame, text="Exemplo", command=self.example).pack(side=tk.LEFT, padx=5)
@@ -59,7 +57,10 @@ class programa:
                                   bg="#4caf50", fg="white", font=("Arial", 10, "bold"), height=2)
         self.btn_calc.pack(fill=tk.X, pady=5)
 
-        # Resumos das estatísticas
+        self.btn_export = tk.Button(left_frame, text="EXPORTAR .XLSX", command=self.export_excel,
+                                    bg="#2196f3", fg="white", font=("Arial", 10, "bold"), height=2)
+        self.btn_export.pack(fill=tk.X, pady=5)
+
         results_frame = tk.LabelFrame(left_frame, text="Resumo Estatístico", font=("Arial", 9, "bold"))
         results_frame.pack(fill=tk.X, pady=5)
 
@@ -74,7 +75,6 @@ class programa:
             lbl.grid(row=idx, column=1, sticky="w", padx=5, pady=2)
             self.res_labels[key] = lbl
 
-        # Tabela F
         lbl_tabela = tk.Label(left_frame, text="Tabela de Dados: Curva F", font=("Arial", 10, "bold"))
         lbl_tabela.pack(pady=(10, 0))
 
@@ -93,7 +93,6 @@ class programa:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # PAINEL DIREITO (GRÁFICOS)
         right_frame = tk.Frame(main_container, bg="white", bd=2, relief=tk.GROOVE)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -116,8 +115,6 @@ class programa:
         self.canvas.draw()
 
     def update_counters(self, event=None):
-        """Atualiza a contagem de elementos em X e Y em tempo real"""
-
         def count_valid_lines(widget):
             content = widget.get(1.0, tk.END).strip()
             if not content:
@@ -127,7 +124,6 @@ class programa:
         nx = count_valid_lines(self.txt_input_x)
         ny = count_valid_lines(self.txt_input_y)
 
-        # Cor de aviso se forem diferentes
         color = "black" if nx == ny else "red"
 
         self.lbl_count_x.config(text=f"Elementos: {nx}", fg=color)
@@ -138,7 +134,12 @@ class programa:
         self.txt_input_y.delete(1.0, tk.END)
         for key in self.res_labels: self.res_labels[key].config(text="---")
 
-        # Resetar contadores
+        self.last_x = None
+        self.last_y = None
+        self.last_treated = None
+        self.last_f_curve = None
+        self.last_stats = None
+
         self.update_counters()
 
         self.ax1.cla()
@@ -170,11 +171,10 @@ class programa:
 
     def example(self):
         self.clean_data()
-        x_ex = "0.25\n0.5\n0.75\n1\n1.25\n1.5\n1.75\n2\n2.25\n2.5\n2.75\n3\n3.25\n3.5\n3.75\n4\n4.25\n4.5\n4.75\n5\n5.25\n5.5\n5.75\n6\n6.25\n6.5\n6.75"
-        y_ex = "0\n0\n0\n0\n0\n0\n0\n0\n0\n0\n0\n0\n0.064053751\n0.131690929\n0.154087346\n0.16019037\n0.176315789\n0.180011198\n0.178443449\n0.180011198\n0.191041433\n0.183706607\n0.182754759\n0.182866741\n0.18980963\n0.199384099\n0.193673012"
+        x_ex = "0\n90\n180\n210\n300\n420\n450\n480\n510\n540\n570\n600\n630\n660\n690\n720\n750\n780\n810\n840\n870\n900\n930\n960\n990\n1020\n1050\n1110\n1170\n1260\n1380\n1470\n1620\n1770\n2100"
+        y_ex = "0.0005\n0.0011\n0.0014\n0.0016\n0.0019\n0.0025\n0.0045\n0.0052\n0.0058\n0.0070\n0.0083\n0.0108\n0.0149\n0.0326\n0.0333\n0.0363\n0.0529\n0.0557\n0.0659\n0.0885\n0.0895\n0.1020\n0.1074\n0.1245\n0.1381\n0.1518\n0.1709\n0.1813\n0.1822\n0.2029\n0.2081\n0.2174\n0.2239\n0.2275\n0.2314"
         self.txt_input_x.insert(tk.END, x_ex)
         self.txt_input_y.insert(tk.END, y_ex)
-        # Atualizar contadores após inserir exemplo
         self.update_counters()
 
     def data_processing(self):
@@ -187,16 +187,17 @@ class programa:
                                      f"As colunas X ({len(x_data)}) e Y ({len(y_data)}) precisam ter a mesma quantidade de elementos.")
                 return
 
-            x_y_curve = calculos.initial_data(x_data, y_data)
-            treated_curve = calculos.boltzmann(x_data, x_y_curve)
-
-            if treated_curve is None:
-                messagebox.showerror("Erro", "Falha no ajuste de Boltzmann.")
-                return
-
+            treated_curve, params, cov = calculos.boltzmann(x_data, y_data)
             y_adjusted = [p[1] for p in treated_curve]
+
             f_curve, y_max = calculos.f_curve_calc(treated_curve)
             stats = calculos.final_stats(x_data, f_curve)
+
+            self.last_x = x_data
+            self.last_y = y_data
+            self.last_treated = treated_curve
+            self.last_f_curve = f_curve
+            self.last_stats = stats
 
             self.res_labels["max_y"].config(text=f"{y_max:.4f}")
             self.res_labels["th"].config(text=f"{stats['hydraulic_time']:.4f}")
@@ -207,11 +208,15 @@ class programa:
             for i in range(len(x_data)):
                 self.tree.insert("", "end", values=(f"{x_data[i]:.2f}", f"{f_curve[i]:.5f}"))
 
-            # Plotagem
+            y_min_raw = min(min(y_data), min(y_adjusted))
+            y_max_raw = max(max(y_data), max(y_adjusted))
+            margin = (y_max_raw - y_min_raw) * 0.1 if y_max_raw != y_min_raw else 1
+
             self.ax1.clear()
             self.ax1.scatter(x_data, y_data, color='red', s=15, label='Experimental')
             self.ax1.plot(x_data, y_data, color='red', alpha=0.3, linestyle='--')
-            self.ax1.set_title("Curva C: Dados Brutos (Experimental)")
+            self.ax1.set_ylim(y_min_raw - margin, y_max_raw + margin)
+            self.ax1.set_title("Curva C: Dados Brutos")
             self.ax1.set_ylabel("C(t)")
             self.ax1.set_xlabel("Tempo (min)")
             self.ax1.grid(True, linestyle=':', alpha=0.7)
@@ -220,6 +225,7 @@ class programa:
             self.ax2.clear()
             self.ax2.plot(x_data, y_adjusted, color='blue', linewidth=2, label='Ajuste Boltzmann')
             self.ax2.fill_between(x_data, y_adjusted, color='blue', alpha=0.1)
+            self.ax2.set_ylim(y_min_raw - margin, y_max_raw + margin)
             self.ax2.set_title("Curva C: Concentração Ajustada")
             self.ax2.set_xlabel("Tempo (min)")
             self.ax2.set_ylabel("C(t)")
@@ -230,6 +236,28 @@ class programa:
 
         except Exception as e:
             messagebox.showerror("Erro", str(e))
+
+    def export_excel(self):
+        if self.last_stats is None:
+            messagebox.showwarning("Aviso", "Calcule os dados antes de exportar (clique em CALCULAR & PLOTAR).")
+            return
+
+        path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Planilha Excel", "*.xlsx")],
+            title="Salvar resultados como"
+        )
+        if not path:
+            return
+
+        try:
+            calculos.export_to_excel(
+                path, self.last_x, self.last_y, self.last_treated,
+                self.last_f_curve, self.last_stats
+            )
+            messagebox.showinfo("Sucesso", f"Arquivo exportado em:\n{path}")
+        except Exception as e:
+            messagebox.showerror("Erro ao exportar", str(e))
 
 
 if __name__ == "__main__":

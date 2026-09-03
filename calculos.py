@@ -1,106 +1,69 @@
-import math
 import numpy as np
 from numpy import trapezoid
+from scipy.optimize import curve_fit
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 
 
-def xAty50(x_y_curve):
-    if len(x_y_curve) < 2:
-        return None
-
-    sortedx_y_curve = sorted(x_y_curve)
-    y_values = [point[1] for point in sortedx_y_curve]
-    y_min = min(y_values)
-    y_max = max(y_values)
-    y_mid = y_min + (y_max - y_min) / 2
-
-    if y_min == y_max:
-        return None
-
-    for i in range(1, len(sortedx_y_curve)):
-        p1 = sortedx_y_curve[i - 1]
-        p2 = sortedx_y_curve[i]
-        x1, y1 = p1
-        x2, y2 = p2
-
-        if (y1 < y_mid < y2) or (y1 >= y_mid > y2):
-            if y2 == y1:
-                return (x1 + x2) / 2
-            x_interpolated = x1 + (x2 - x1) * (y_mid - y1) / (y2 - y1)
-            return x_interpolated
-    return None
+def boltzmann_model(x, A1, A2, x0, dx):
+    return A2 + (A1 - A2) / (1 + np.exp((x - x0) / dx))
 
 
-def curveParameters(x_y_curve):
-    if len(x_y_curve) < 2:
-        return None, None
+def estimar_chute_inicial(x_data, y_data):
+    x_data = np.asarray(x_data, dtype=float)
+    y_data = np.asarray(y_data, dtype=float)
 
-    sortedx_y_curve = sorted(x_y_curve)
-    y_values = [point[1] for point in sortedx_y_curve]
-    yAtxMin = sortedx_y_curve[0][1]
-    yAtxMax = sortedx_y_curve[-1][1]
-    if yAtxMin > yAtxMax:
-        return max(y_values), min(y_values)
-    else:
-        return min(y_values), max(y_values)
+    A1_guess = y_data[0]
+    A2_guess = y_data[-1]
 
+    y_mid = A1_guess + (A2_guess - A1_guess) / 2
+    idx = np.argmin(np.abs(y_data - y_mid))
+    x0_guess = x_data[idx]
 
-def initial_data(x_data, y_data):
-    x_y_curve = []
-    for i in range(len(x_data)):
-        x_y_curve.append((x_data[i], y_data[i])) # juntando x e y em uma tupla
-    return x_y_curve
+    dx_guess = (x_data.max() - x_data.min()) / 20.0
+
+    return A1_guess, A2_guess, x0_guess, dx_guess
 
 
-def boltzmann(x_data, x_y_curve):
-    x_values = [point[0] for point in x_y_curve]
-    x_min, x_max = min(x_values), max(x_values)
+def boltzmann(x_data, y_data):
+    x_data = np.asarray(x_data, dtype=float)
+    y_data = np.asarray(y_data, dtype=float)
 
-    # cálculo dos parâmetros
-    dx = (x_max - x_min) / 20.0
-    A1, A2 = curveParameters(x_y_curve)
-    x0 = xAty50(x_y_curve)
+    p0 = estimar_chute_inicial(x_data, y_data)
 
-    if x0 is None:
-        return None  # Retorna None para indicar erro
+    params, cov = curve_fit(
+        boltzmann_model, x_data, y_data, p0=p0, method="lm", maxfev=10000
+    )
+    A1, A2, x0, dx = params
 
-    treated_x_y_curve = []
-    for i in range(len(x_y_curve)):
-        # Fórmula sigmoidal original
-        y = A2 + (A1 - A2) / (1 + math.exp((x_data[i] - x0) / dx))
-        treated_x_y_curve.append((x_data[i], y))
+    y_fit = boltzmann_model(x_data, *params)
+    treated_x_y_curve = list(zip(x_data, y_fit))
 
-    return treated_x_y_curve
+    return treated_x_y_curve, params, cov
 
 
 def f_curve_calc(treated_x_y_curve):
     y_treated_values = [point[1] for point in treated_x_y_curve]
-    y_treated_max = max(y_treated_values) # pega o maior valor de Y
+    y_treated_max = max(y_treated_values)
 
-    f_curve = []
-    for i in range(len(treated_x_y_curve)):
-        f_curve.append(treated_x_y_curve[i][1] / y_treated_max)
-
+    f_curve = [y / y_treated_max for _, y in treated_x_y_curve]
     return f_curve, y_treated_max
+
 
 def final_stats(x_data, f_curve):
     x_values_np = np.array(x_data)
     f_values_np = np.array(f_curve)
 
-    # derivada curva E
     E_t_curve = np.gradient(f_values_np, x_values_np)
 
-    # tempo hidráulico
     integrand = x_values_np * E_t_curve
     hydraulic_time = trapezoid(integrand, x_values_np)
 
-    # variância
     variance_calc = (x_values_np - hydraulic_time) ** 2 * E_t_curve
     variance = trapezoid(variance_calc, x_values_np)
 
-    # sigma theta
-    sigma_theta = (variance / (hydraulic_time ** 2))
+    sigma_theta = variance / (hydraulic_time ** 2)
 
-    # valor de N
     N = 1 / sigma_theta if sigma_theta != 0 else 0
 
     return {
@@ -109,56 +72,54 @@ def final_stats(x_data, f_curve):
         "hydraulic_time": hydraulic_time,
         "variance": variance,
         "sigma_theta": sigma_theta,
-        "N": N
+        "N": N,
     }
 
 
+def export_to_excel(path, x_data, y_data, treated_curve, f_curve, stats):
+    y_adjusted = [p[1] for p in treated_curve]
+    e_curve = stats["E_t_curve"]
 
-def main():
-    x_data = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5, 5.25,
-              5.5, 5.75, 6, 6.25, 6.5, 6.75]
-    y_data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.064053751, 0.131690929, 0.154087346, 0.16019037, 0.176315789,
-              0.180011198, 0.178443449, 0.180011198, 0.191041433, 0.183706607, 0.182754759, 0.182866741, 0.18980963,
-              0.199384099, 0.193673012]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Resultados"
 
-    # tratando os dados
-    x_y_curve = initial_data(x_data, y_data)
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="4472C4")
 
-    # ajustando a curva
-    treated_x_y_curve = boltzmann(x_data, x_y_curve)
+    headers = ["Tempo", "Concentração", "Concentração ajustada", "Curva F", "Curva E"]
+    for col, title in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col, value=title)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
 
-    if treated_x_y_curve is None:
-        print("xaty50 could not be determined. Check the input data.")
-        return
+    for i in range(len(x_data)):
+        ws.cell(row=i + 2, column=1, value=x_data[i])
+        ws.cell(row=i + 2, column=2, value=y_data[i])
+        ws.cell(row=i + 2, column=3, value=y_adjusted[i])
+        ws.cell(row=i + 2, column=4, value=f_curve[i])
+        ws.cell(row=i + 2, column=5, value=float(e_curve[i]))
 
-    print("Valores ajustados:")
-    for i in range(len(treated_x_y_curve)):
-        print(f"({treated_x_y_curve[i][0]:.2f}) ({treated_x_y_curve[i][1]:.5f})")
+    ws.column_dimensions["A"].width = 12
+    ws.column_dimensions["B"].width = 18
+    ws.column_dimensions["C"].width = 20
+    ws.column_dimensions["D"].width = 12
+    ws.column_dimensions["E"].width = 12
 
-    # curva F
-    f_curve, y_treated_max = f_curve_calc(treated_x_y_curve)
+    summary_labels = ["θh (tempo hidráulico médio)", "σ² (variância)",
+                      "σθ² (variância adimensional)", "N (reatores em série)"]
+    summary_values = [stats["hydraulic_time"], stats["variance"],
+                      stats["sigma_theta"], stats["N"]]
 
-    print(y_treated_max)
-    print("")
-    print("Curva F:")
-    for val in f_curve:
-        print(val)
-    print("")
+    ws.cell(row=1, column=7, value="Resumo").font = header_font
+    ws.cell(row=1, column=7).fill = header_fill
+    ws.cell(row=1, column=8).fill = header_fill
 
-    #  estatísticas e curva E
-    stats = final_stats(x_data, f_curve)
+    for i, (label, value) in enumerate(zip(summary_labels, summary_values), start=2):
+        ws.cell(row=i, column=7, value=label)
+        ws.cell(row=i, column=8, value=value)
+    ws.column_dimensions["G"].width = 28
+    ws.column_dimensions["H"].width = 16
 
-    # mostrando a curva E em função do tempo
-    for x_val, e_val in zip(stats["x_values_np"], stats["E_t_curve"]):
-        print(f"At x = {x_val:.2f} : E(t) = {e_val:.5f}")
-
-    print("")
-    print(f"θh: {stats['hydraulic_time']:.5f}")
-    print(f"σ²: {stats['variance']}")
-    print("")
-    print(f"σθ²: {stats['sigma_theta']}")
-    print(f"O valor de N é: {stats['N']:.2f}")
-
-
-if __name__ == "__main__":
-    main()
+    wb.save(path)
